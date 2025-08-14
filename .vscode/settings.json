@@ -1,0 +1,24 @@
+{
+    // Disable C++ IntelliSense warnings and errors
+    "C_Cpp.errorSquiggles": "disabled",
+    
+    // Disable all problem matchers
+    "problems.showErrors": false,
+    "problems.showWarnings": false,
+    "problems.showInfos": false,
+    
+    // Disable specific C++ diagnostics
+    "C_Cpp.intelliSenseEngine": "disabled",
+    
+    // Alternative: Keep IntelliSense but disable error reporting
+    // "C_Cpp.intelliSenseEngine": "default",
+    // "C_Cpp.loggingLevel": "Error",
+    
+    // Disable file watcher notifications
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/*/**": true,
+        "**/.hg/store/**": true
+    }
+}
