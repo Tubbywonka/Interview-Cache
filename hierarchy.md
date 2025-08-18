@@ -1,19 +1,25 @@
 # IC Hierarchy
 
-## Hardware
-- **100 Days of RTL**
-    *TBD*
-- **Computer Architecture**
-    *TBD*
-- **Logic Design**
-    *TBD*
-- **RTL Code**
+## 🛠️ Hardware
+
+**100 Days of RTL**  
+_TBD_
+
+**Computer Architecture**  
+_TBD_
+
+**Logic Design**  
+_TBD_
+
+**RTL Code**
   - Counter (with enable + reset)
   - IMC OA
   - Synchronous FIFO
 
-## Software
-- **DS Code (C++)**
+
+## 💻 Software
+
+**DS Code (C++)**
   - Vector
   - Stack
   - Queue
@@ -23,7 +29,7 @@
   - Deque
   - BST
 
-- **Leetcode Log**
+**Leetcode Log**
   - Arrays + Hashing
   - Two Pointer
   - Sliding Window
@@ -34,5 +40,5 @@
   - 1D DP
   - Bit Manipulation
 
-- **Software Concepts**  
-  *TBD*
+**Software Concepts**  
+_TBD_
