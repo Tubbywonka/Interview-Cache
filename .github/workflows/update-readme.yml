@@ -1,4 +1,3 @@
-```yaml
 name: Update README with Directory Tree
 
 on:
@@ -12,27 +11,30 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Install tree
-      run: sudo apt-get install -y tree
+      run: sudo apt-get update && sudo apt-get install -y tree
 
     - name: Generate directory tree
-      run: tree -a -I '.git|node_modules|build|dist|venv' -L 3 > tree.txt
+      run: tree -a -I '.git|node_modules|build|dist|venv|.github' -L 3 > tree.txt
 
     - name: Ensure README exists with minimal format
       run: |
         if [ ! -f README.md ]; then
           cat << 'EOF' > README.md
-# IC Design Study Repository
+        # IC Design Study Repository
 
-Study materials and code for Integrated Circuit (IC) design, covering interviews, knowledge areas, RTL design, and software development.
+        Study materials and code for Integrated Circuit (IC) design, covering interviews, knowledge areas, RTL design, and software development.
 
-## Project Structure
-```text
-Placeholder for directory tree
-```
-EOF
+        ## Project Structure
+        ```text
+        Placeholder for directory tree
+        ```
+        EOF
         fi
+        
         # Ensure Project Structure section exists
         if ! grep -q "## Project Structure" README.md; then
           echo -e "\n## Project Structure\n\`\`\`text\nPlaceholder for directory tree\n\`\`\`" >> README.md
@@ -40,15 +42,47 @@ EOF
 
     - name: Update Project Structure section in README
       run: |
-        # Replace Project Structure section with new tree
-        sed -i '/## Project Structure/,/## /{//!d}' README.md
-        sed -i '/## Project Structure/a ```text\n'"$(cat tree.txt)"'\n```' README.md
+        # Create a temporary file with the tree content
+        TREE_CONTENT=$(cat tree.txt)
+        
+        # Use Python to safely update the README
+        python3 << 'EOF'
+        import re
+        
+        # Read the current README
+        with open('README.md', 'r') as f:
+            content = f.read()
+        
+        # Read the tree content
+        with open('tree.txt', 'r') as f:
+            tree_content = f.read().strip()
+        
+        # Pattern to match the Project Structure section
+        pattern = r'(## Project Structure\n)```text\n.*?\n```'
+        replacement = f'\\1```text\n{tree_content}\n```'
+        
+        # Replace the section
+        new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        
+        # Write back to file
+        with open('README.md', 'w') as f:
+            f.write(new_content)
+        EOF
+
+    - name: Check for changes
+      id: verify-changed-files
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
 
     - name: Commit and push changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add README.md
-        git diff --staged --quiet || git commit -m "Auto-update README with directory tree"
+        git commit -m "Auto-update README with directory tree"
         git push
-```
