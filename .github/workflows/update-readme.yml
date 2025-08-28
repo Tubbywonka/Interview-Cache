@@ -1,9 +1,9 @@
-name: Update README with Directory Tree
+name: GitHub API README Generator
 
 on:
   push:
-    branches: [ main ]  # Trigger on pushes to main branch
-  workflow_dispatch:  # Allow manual trigger via Actions tab
+    branches: [ master ]
+  workflow_dispatch:
 
 jobs:
   update-readme:
@@ -16,59 +16,238 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Install tree
-      run: sudo apt-get update && sudo apt-get install -y tree
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y tree curl jq
 
-    - name: Generate directory tree
-      run: tree -a -I '.git|node_modules|build|dist|venv|.github' -L 3 > tree.txt
-
-    - name: Ensure README exists with minimal format
+    - name: Generate README using GitHub API
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        if [ ! -f README.md ]; then
-          cat << 'EOF' > README.md
-        # IC Design Study Repository
-
-        Study materials and code for Integrated Circuit (IC) design, covering interviews, knowledge areas, RTL design, and software development.
-
-        ## Project Structure
-        ```text
-        Placeholder for directory tree
-        ```
-        EOF
-        fi
-        
-        # Ensure Project Structure section exists
-        if ! grep -q "## Project Structure" README.md; then
-          echo -e "\n## Project Structure\n\`\`\`text\nPlaceholder for directory tree\n\`\`\`" >> README.md
-        fi
-
-    - name: Update Project Structure section in README
-      run: |
-        # Create a temporary file with the tree content
-        TREE_CONTENT=$(cat tree.txt)
-        
-        # Use Python to safely update the README
         python3 << 'EOF'
-        import re
+        import os
+        import subprocess
+        import json
+        import requests
+        from pathlib import Path
+
+        def get_directory_structure():
+            """Get directory tree without creating temp files"""
+            result = subprocess.run([
+                'tree', '-a', '-I', 
+                '.git|node_modules|build|dist|venv|.github|__pycache__|*.pyc|.DS_Store|Thumbs.db|*.log',
+                '-L', '3'
+            ], capture_output=True, text=True)
+            return result.stdout.strip()
+
+        def analyze_repository_files():
+            """Analyze repository files to determine project type and features"""
+            analysis = {
+                'languages': set(),
+                'project_type': [],
+                'features': [],
+                'setup_files': [],
+                'has_tests': False,
+                'has_docs': False
+            }
+            
+            for root, dirs, files in os.walk('.'):
+                # Skip hidden and build directories
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', 'build', 'dist', 'venv', '__pycache__']]
+                
+                for file in files:
+                    file_lower = file.lower()
+                    
+                    # Detect languages and project types
+                    if file.endswith('.py'):
+                        analysis['languages'].add('Python')
+                    elif file.endswith(('.js', '.jsx', '.ts', '.tsx')):
+                        analysis['languages'].add('JavaScript/TypeScript')
+                    elif file.endswith(('.v', '.sv')):
+                        analysis['languages'].add('Verilog/SystemVerilog')
+                        analysis['project_type'].append('Digital Design')
+                    elif file.endswith('.vhd'):
+                        analysis['languages'].add('VHDL')
+                        analysis['project_type'].append('Digital Design')
+                    elif file.endswith(('.cpp', '.cc', '.cxx', '.c')):
+                        analysis['languages'].add('C/C++')
+                    elif file.endswith('.java'):
+                        analysis['languages'].add('Java')
+                    
+                    # Detect setup files
+                    if file == 'package.json':
+                        analysis['setup_files'].append('Node.js (package.json)')
+                    elif file == 'requirements.txt':
+                        analysis['setup_files'].append('Python (requirements.txt)')
+                    elif file == 'Makefile':
+                        analysis['setup_files'].append('Make (Makefile)')
+                    elif file == 'Dockerfile':
+                        analysis['setup_files'].append('Docker (Dockerfile)')
+                    
+                    # Detect project characteristics
+                    if 'test' in file_lower or file_lower.startswith('test'):
+                        analysis['has_tests'] = True
+                    elif any(term in file_lower for term in ['readme', 'doc', 'guide']):
+                        analysis['has_docs'] = True
+                    elif any(term in file_lower for term in ['interview', 'leetcode', 'coding']):
+                        analysis['project_type'].append('Interview Preparation')
+                    elif any(term in file_lower for term in ['rtl', 'fpga', 'asic']):
+                        analysis['project_type'].append('IC Design')
+            
+            return analysis
+
+        def get_github_repo_info():
+            """Fetch repository information from GitHub API"""
+            repo_name = os.environ.get('GITHUB_REPOSITORY', 'unknown/repo')
+            token = os.environ.get('GITHUB_TOKEN')
+            
+            headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+            
+            try:
+                response = requests.get(f'https://api.github.com/repos/{repo_name}', headers=headers)
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    print(f"GitHub API error: {response.status_code}")
+                    return {}
+            except Exception as e:
+                print(f"Error fetching GitHub repo info: {e}")
+                return {}
+
+        def generate_intelligent_readme():
+            """Generate README using GitHub API data and repository analysis"""
+            repo_info = get_github_repo_info()
+            analysis = analyze_repository_files()
+            directory_tree = get_directory_structure()
+            
+            # Extract repository details
+            repo_name = repo_info.get('name', 'Repository')
+            description = repo_info.get('description', 'A comprehensive development repository')
+            language = repo_info.get('language', 'Multiple Languages')
+            topics = repo_info.get('topics', [])
+            
+            # Build README content
+            readme_content = f"# {repo_name.replace('-', ' ').replace('_', ' ').title()}\n\n"
+            readme_content += f"{description}\n\n"
+            
+            # Add badges if we have language info
+            if language and language != 'Multiple Languages':
+                readme_content += f"![Language](https://img.shields.io/badge/Language-{language}-blue)\n"
+            if topics:
+                for topic in topics[:3]:  # Limit to 3 topics
+                    readme_content += f"![{topic}](https://img.shields.io/badge/Topic-{topic}-green)\n"
+            readme_content += "\n"
+            
+            # Add overview section
+            readme_content += "## Overview\n\n"
+            if analysis['project_type']:
+                readme_content += "This repository focuses on:\n"
+                for ptype in set(analysis['project_type']):
+                    readme_content += f"- {ptype}\n"
+                readme_content += "\n"
+            
+            if analysis['languages']:
+                readme_content += f"**Primary Languages:** {', '.join(sorted(analysis['languages']))}\n\n"
+            
+            # Add features section
+            features = []
+            if analysis['has_tests']:
+                features.append("✅ Comprehensive test coverage")
+            if analysis['has_docs']:
+                features.append("📚 Detailed documentation")
+            if 'Digital Design' in analysis['project_type']:
+                features.append("🔧 RTL design and verification")
+            if 'Interview Preparation' in analysis['project_type']:
+                features.append("💼 Interview and coding challenges")
+            if analysis['setup_files']:
+                features.append("⚙️ Easy setup and configuration")
+            
+            if features:
+                readme_content += "## Features\n\n"
+                for feature in features:
+                    readme_content += f"- {feature}\n"
+                readme_content += "\n"
+            
+            # Add project structure
+            readme_content += "## Project Structure\n\n"
+            readme_content += f"```text\n{directory_tree}\n```\n\n"
+            
+            # Add installation section based on detected setup files
+            if analysis['setup_files']:
+                readme_content += "## Getting Started\n\n"
+                readme_content += "### Prerequisites\n\n"
+                
+                for setup_file in analysis['setup_files']:
+                    if 'Python' in setup_file:
+                        readme_content += "- Python 3.7+ and pip\n"
+                    elif 'Node.js' in setup_file:
+                        readme_content += "- Node.js 14+ and npm/yarn\n"
+                    elif 'Make' in setup_file:
+                        readme_content += "- Make build system\n"
+                    elif 'Docker' in setup_file:
+                        readme_content += "- Docker and docker-compose\n"
+                
+                readme_content += "\n### Installation\n\n"
+                readme_content += "1. Clone the repository:\n```bash\n"
+                readme_content += f"git clone https://github.com/{os.environ.get('GITHUB_REPOSITORY', 'user/repo')}.git\n"
+                readme_content += f"cd {repo_name}\n```\n\n"
+                
+                readme_content += "2. Install dependencies:\n```bash\n"
+                for setup_file in analysis['setup_files']:
+                    if 'Python' in setup_file:
+                        readme_content += "pip install -r requirements.txt\n"
+                    elif 'Node.js' in setup_file:
+                        readme_content += "npm install\n"
+                    elif 'Make' in setup_file:
+                        readme_content += "make install\n"
+                    elif 'Docker' in setup_file:
+                        readme_content += "docker-compose up -d\n"
+                readme_content += "```\n\n"
+            
+            # Add usage section based on project type
+            if analysis['project_type']:
+                readme_content += "## Usage\n\n"
+                for ptype in set(analysis['project_type']):
+                    if ptype == 'Digital Design':
+                        readme_content += "### Digital Design\n"
+                        readme_content += "- RTL design examples and templates\n"
+                        readme_content += "- Verification testbenches and methodologies\n"
+                        readme_content += "- Synthesis and implementation guides\n\n"
+                    elif ptype == 'Interview Preparation':
+                        readme_content += "### Interview Preparation\n"
+                        readme_content += "- Coding challenges and solutions\n"
+                        readme_content += "- System design problems\n"
+                        readme_content += "- Technical interview guides\n\n"
+                    elif ptype == 'IC Design':
+                        readme_content += "### IC Design\n"
+                        readme_content += "- Circuit design methodologies\n"
+                        readme_content += "- CAD tool workflows\n"
+                        readme_content += "- Design verification approaches\n\n"
+            
+            # Add contributing section
+            readme_content += "## Contributing\n\n"
+            readme_content += "Contributions are welcome! Please:\n\n"
+            readme_content += "1. Fork the repository\n"
+            readme_content += "2. Create a feature branch (`git checkout -b feature/amazing-feature`)\n"
+            readme_content += "3. Commit your changes (`git commit -m 'Add some amazing feature'`)\n"
+            readme_content += "4. Push to the branch (`git push origin feature/amazing-feature`)\n"
+            readme_content += "5. Open a Pull Request\n\n"
+            
+            # Add license section
+            readme_content += "## License\n\n"
+            readme_content += "This project is open source. See individual files for specific licensing information.\n\n"
+            
+            # Add footer
+            readme_content += "---\n"
+            readme_content += "*This README was automatically generated using GitHub API and repository analysis.*\n"
+            
+            return readme_content
+
+        # Generate and write README
+        readme_content = generate_intelligent_readme()
+        with open('README.md', 'w', encoding='utf-8') as f:
+            f.write(readme_content)
         
-        # Read the current README
-        with open('README.md', 'r') as f:
-            content = f.read()
-        
-        # Read the tree content
-        with open('tree.txt', 'r') as f:
-            tree_content = f.read().strip()
-        
-        # Pattern to match the Project Structure section
-        pattern = r'(## Project Structure\n)```text\n.*?\n```'
-        replacement = f'\\1```text\n{tree_content}\n```'
-        
-        # Replace the section
-        new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        # Write back to file
-        with open('README.md', 'w') as f:
-            f.write(new_content)
+        print("Generated intelligent README using GitHub API")
         EOF
 
     - name: Check for changes
@@ -86,5 +265,5 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add README.md
-        git commit -m "Auto-update README with directory tree"
+        git commit -m "Auto-generate README using GitHub API and repository analysis"
         git push
