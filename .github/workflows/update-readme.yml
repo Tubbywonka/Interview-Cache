@@ -1,0 +1,54 @@
+```yaml
+name: Update README with Directory Tree
+
+on:
+  push:
+    branches: [ main ]  # Trigger on pushes to main branch
+  workflow_dispatch:  # Allow manual trigger via Actions tab
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install tree
+      run: sudo apt-get install -y tree
+
+    - name: Generate directory tree
+      run: tree -a -I '.git|node_modules|build|dist|venv' -L 3 > tree.txt
+
+    - name: Ensure README exists with minimal format
+      run: |
+        if [ ! -f README.md ]; then
+          cat << 'EOF' > README.md
+# IC Design Study Repository
+
+Study materials and code for Integrated Circuit (IC) design, covering interviews, knowledge areas, RTL design, and software development.
+
+## Project Structure
+```text
+Placeholder for directory tree
+```
+EOF
+        fi
+        # Ensure Project Structure section exists
+        if ! grep -q "## Project Structure" README.md; then
+          echo -e "\n## Project Structure\n\`\`\`text\nPlaceholder for directory tree\n\`\`\`" >> README.md
+        fi
+
+    - name: Update Project Structure section in README
+      run: |
+        # Replace Project Structure section with new tree
+        sed -i '/## Project Structure/,/## /{//!d}' README.md
+        sed -i '/## Project Structure/a ```text\n'"$(cat tree.txt)"'\n```' README.md
+
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add README.md
+        git diff --staged --quiet || git commit -m "Auto-update README with directory tree"
+        git push
+```
