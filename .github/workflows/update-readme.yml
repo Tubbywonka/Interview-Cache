@@ -132,40 +132,12 @@ jobs:
             # Add badges if we have language info
             if language and language != 'Multiple Languages':
                 readme_content += f"![Language](https://img.shields.io/badge/Language-{language}-blue)\n"
-            if topics:
-                for topic in topics[:3]:  # Limit to 3 topics
-                    readme_content += f"![{topic}](https://img.shields.io/badge/Topic-{topic}-green)\n"
-            readme_content += "\n"
             
             # Add overview section
             readme_content += "## Overview\n\n"
-            if analysis['project_type']:
-                readme_content += "This repository focuses on:\n"
-                for ptype in set(analysis['project_type']):
-                    readme_content += f"- {ptype}\n"
-                readme_content += "\n"
             
             if analysis['languages']:
                 readme_content += f"**Primary Languages:** {', '.join(sorted(analysis['languages']))}\n\n"
-            
-            # Add features section
-            features = []
-            if analysis['has_tests']:
-                features.append("✅ Comprehensive test coverage")
-            if analysis['has_docs']:
-                features.append("📚 Detailed documentation")
-            if 'Digital Design' in analysis['project_type']:
-                features.append("🔧 RTL design and verification")
-            if 'Interview Preparation' in analysis['project_type']:
-                features.append("💼 Interview and coding challenges")
-            if analysis['setup_files']:
-                features.append("⚙️ Easy setup and configuration")
-            
-            if features:
-                readme_content += "## Features\n\n"
-                for feature in features:
-                    readme_content += f"- {feature}\n"
-                readme_content += "\n"
             
             # Add project structure
             readme_content += "## Project Structure\n\n"
@@ -202,35 +174,6 @@ jobs:
                     elif 'Docker' in setup_file:
                         readme_content += "docker-compose up -d\n"
                 readme_content += "```\n\n"
-            
-            # Add usage section based on project type
-            if analysis['project_type']:
-                readme_content += "## Usage\n\n"
-                for ptype in set(analysis['project_type']):
-                    if ptype == 'Digital Design':
-                        readme_content += "### Digital Design\n"
-                        readme_content += "- RTL design examples and templates\n"
-                        readme_content += "- Verification testbenches and methodologies\n"
-                        readme_content += "- Synthesis and implementation guides\n\n"
-                    elif ptype == 'Interview Preparation':
-                        readme_content += "### Interview Preparation\n"
-                        readme_content += "- Coding challenges and solutions\n"
-                        readme_content += "- System design problems\n"
-                        readme_content += "- Technical interview guides\n\n"
-                    elif ptype == 'IC Design':
-                        readme_content += "### IC Design\n"
-                        readme_content += "- Circuit design methodologies\n"
-                        readme_content += "- CAD tool workflows\n"
-                        readme_content += "- Design verification approaches\n\n"
-            
-            # Add contributing section
-            readme_content += "## Contributing\n\n"
-            readme_content += "Contributions are welcome! Please:\n\n"
-            readme_content += "1. Fork the repository\n"
-            readme_content += "2. Create a feature branch (`git checkout -b feature/amazing-feature`)\n"
-            readme_content += "3. Commit your changes (`git commit -m 'Add some amazing feature'`)\n"
-            readme_content += "4. Push to the branch (`git push origin feature/amazing-feature`)\n"
-            readme_content += "5. Open a Pull Request\n\n"
             
             # Add license section
             readme_content += "## License\n\n"
